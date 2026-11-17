@@ -21,7 +21,7 @@ test('the Client module registers every surface against a fake Cordis context', 
   globalThis.window = {
     __ModuleLoader__: {
       load(definition) {
-        assert.equal(definition.id, '@local/fishpi-chat')
+        assert.equal(definition.id, '@iwpz/fishpi-dsh')
         factory = definition.factory
       },
     },
@@ -73,12 +73,12 @@ test('the Client module registers every surface against a fake Cordis context', 
 
   const tab = registrations.find(entry => entry.surface === 'tab')
   assert.equal(tab.definition.kind, 'fishpi.chat')
-  assert.equal(tab.definition.id, '@local/fishpi-chat')
+  assert.equal(tab.definition.id, '@iwpz/fishpi-dsh')
   assert.equal(tab.definition.guide[0].id, 'open')
 
   const slots = registrations.filter(entry => entry.surface === 'slot').map(entry => entry.options)
-  assert.ok(slots.some(options => options.name === 'sidebar.right.pane.tab' && options.key === '@local/fishpi-chat'))
-  assert.ok(slots.some(options => options.name === 'sidebar.right.pane.tab.title' && options.key === '@local/fishpi-chat'))
+  assert.ok(slots.some(options => options.name === 'sidebar.right.pane.tab' && options.key === '@iwpz/fishpi-dsh'))
+  assert.ok(slots.some(options => options.name === 'sidebar.right.pane.tab.title' && options.key === '@iwpz/fishpi-dsh'))
   assert.ok(slots.some(options => options.name === 'conversation.session.header.utilities' && options.id === 'fishpi-chat'))
   assert.ok(slots.some(options => options.name === 'settings.section' && options.id === 'fishpi-chat'))
   assert.ok(slots.some(options => options.name === 'settings.section.icon' && options.id === 'fishpi-chat'))

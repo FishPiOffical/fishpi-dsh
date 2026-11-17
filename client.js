@@ -11,7 +11,7 @@
  */
 
 window.__ModuleLoader__.load({
-  id: '@local/fishpi-chat',
+  id: '@iwpz/fishpi-dsh',
   factory(require) {
     const React = require('react')
     const h = React.createElement
@@ -27,7 +27,7 @@ window.__ModuleLoader__.load({
     /** Right-Sidebar tab kind; opened by the guide entry and the header button. */
     const TAB_KIND = 'fishpi.chat'
     /** Tab implementation identity: the key its body, title, and definition share. */
-    const TAB_ID = '@local/fishpi-chat'
+    const TAB_ID = '@iwpz/fishpi-dsh'
     /** Client locale namespace. */
     const NS = 'fishpiChat'
     /** Host route prefix, document-relative so deployments under a path prefix work. */
@@ -3612,4 +3612,3 @@ window.__ModuleLoader__.load({
   },
 })
 ;
-//# sourceMappingURL=??@local/fishpi-chat/client.js.map&rev=61879e46d8d8
