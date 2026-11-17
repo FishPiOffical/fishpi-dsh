@@ -1,6 +1,6 @@
 {
   "name": "@iwpz/fishpi-dsh",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "摸鱼派(fishpi.cn)在线聊天室 DSH版本。",
   "type": "module",
   "exports": {

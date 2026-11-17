@@ -7,7 +7,7 @@
 - 包名：`@iwpz/fishpi-dsh`
 - 当前版本：`0.1.0`
 
-![FishPi chatroom preview](docs/preview.svg)
+![DSH 右侧边栏中的摸鱼派聊天室](docs/screenshot.jpg)
 
 ## 功能
 
