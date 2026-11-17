@@ -1,0 +1,37 @@
+{
+  "name": "@local/fishpi-chat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "摸鱼派(fishpi.cn)在线聊天室 DSH版本。",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.webp"
+  },
+  "files": [
+    "index.js",
+    "fishpi.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.webp",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  }
+}

@@ -1,0 +1,3 @@
+- insert:
+    - id: fishpi-chat
+      name: '@local/fishpi-chat'
