@@ -1,4 +1,4 @@
-# npm Trusted Publisher: FishPiOffical/fishpi-dsh, workflow release.yml.
+# npm Trusted Publisher: FishPiOffical/fishpi-dsh, release.yml, environment publish.
 name: Release
 
 on:
@@ -13,6 +13,7 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: publish
     permissions:
       contents: write
       id-token: write
