@@ -22,7 +22,17 @@ import {
   md5Hex,
   normalizeMe,
   normalizeMessage,
+  PLUGIN_VERSION,
 } from './fishpi.js'
+
+/** This package's npm identity and the cadence of its update reminder. */
+const PACKAGE_NAME = '@iwpz/fishpi-dsh'
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000
+const UPDATE_REQUEST_TIMEOUT_MS = 8_000
+const UPDATE_SOURCES = [
+  { source: 'npm', url: `https://registry.npmjs.org/${encodeURIComponent(PACKAGE_NAME)}/latest` },
+  { source: 'npmmirror', url: `https://registry.npmmirror.com/${encodeURIComponent(PACKAGE_NAME)}/latest` },
+]
 
 /** Credential record address: `<scope>/<id>`, both lowercase hyphenated. */
 const CREDENTIAL_KEY = 'fishpi-chat/account'
@@ -35,6 +45,56 @@ const EVENT_WAIT_MS = 20_000
 
 /** Retained realtime events; the browser reloads its window on a gap. */
 const EVENT_LOG_LIMIT = 500
+
+/**
+ * Parse a semver-like version, including an optional prerelease.
+ * @param {unknown} value - candidate version.
+ * @returns {{ major: number, minor: number, patch: number, pre: string }|undefined}
+ */
+function parseVersion(value) {
+  if (typeof value !== 'string') return undefined
+  const match = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/u.exec(value.trim())
+  if (match === null) return undefined
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+    pre: match[4] ?? '',
+  }
+}
+
+/**
+ * Compare two semver-like versions. A prerelease sorts below its release.
+ * @param {unknown} left - first version.
+ * @param {unknown} right - second version.
+ * @returns {-1|0|1} negative when `left` is older.
+ */
+export function compareVersions(left, right) {
+  const first = parseVersion(left)
+  const second = parseVersion(right)
+  if (first === undefined || second === undefined) return 0
+  for (const part of ['major', 'minor', 'patch']) {
+    if (first[part] !== second[part]) return first[part] < second[part] ? -1 : 1
+  }
+  if (first.pre === second.pre) return 0
+  if (first.pre === '') return 1
+  if (second.pre === '') return -1
+  const leftParts = first.pre.split('.')
+  const rightParts = second.pre.split('.')
+  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
+    const a = leftParts[index]
+    const b = rightParts[index]
+    if (a === undefined) return -1
+    if (b === undefined) return 1
+    if (a === b) continue
+    const aNumeric = /^\d+$/u.test(a)
+    const bNumeric = /^\d+$/u.test(b)
+    if (aNumeric && bNumeric) return Number(a) < Number(b) ? -1 : 1
+    if (aNumeric !== bNumeric) return aNumeric ? -1 : 1
+    return a < b ? -1 : 1
+  }
+  return 0
+}
 
 /** Cordis Host services this plugin needs. */
 export const inject = ['connection', 'credentials']
@@ -162,6 +222,7 @@ class FishPiChat {
     this.ctx = options.ctx
     this.hub = options.hub
     this.api = new FishPiApi({ siteUrl: DEFAULT_SITE })
+    this.updateCheckEnabled = options.updateCheck !== false
     this.stopped = false
     this.initialized = false
     this.loggedIn = false
@@ -169,6 +230,9 @@ class FishPiChat {
     /** @type {Record<string, any>|undefined} */
     this.record = undefined
     this.tokenExpiresAt = 0
+    /** @type {string} */
+    this.refreshCookie = ''
+    this.refreshExpiresAt = 0
     /** @type {'connecting'|'connected'|'disconnected'} */
     this.connectionState = 'disconnected'
     /** @type {FishPiError|undefined} */
@@ -177,11 +241,27 @@ class FishPiChat {
     this.realtime = undefined
     /** @type {Promise<void>|undefined} */
     this.loginTask = undefined
+    /** @type {Promise<void>|undefined} */
+    this.refreshTask = undefined
     /** @type {Map<string, { at: number, medals: object[] }>} */
     this.medalCache = new Map()
+    this.updateInfo = {
+      current: PLUGIN_VERSION,
+      latest: '',
+      available: false,
+      localAhead: false,
+      url: '',
+      source: '',
+      checkedAt: 0,
+      error: null,
+    }
+    /** @type {Promise<object>|undefined} */
+    this.updateTask = undefined
+    this.updateTimer = undefined
+    this.lastUpdateCheckAt = 0
   }
 
-  /** Load stored credentials, validate the token, and start the socket. */
+  /** Load stored credentials, validate or renew the token, and start the socket. */
   async initialize() {
     try {
       const stored = await this.ctx.credentials.readRecord(CREDENTIAL_KEY)
@@ -195,20 +275,33 @@ class FishPiChat {
     if (this.record?.accessToken) {
       this.api.setToken(String(this.record.accessToken))
       this.tokenExpiresAt = Number(this.record.tokenExpiresAt) || 0
+      this.refreshExpiresAt = Number(this.record.refreshExpiresAt) || 0
+      this.refreshCookie = typeof this.record.refreshCookie === 'string' ? this.record.refreshCookie : ''
       try {
-        const me = await this.api.me()
-        this.user = normalizeMe(me)
-        this.loggedIn = this.user !== undefined
+        await this.#loadMe()
       } catch (error) {
         const authFailure = error instanceof FishPiError
           && (error.status === 401 || error.status === 403 || error.code === 'unauthorized')
         if (authFailure) {
           this.api.setToken('')
+          this.tokenExpiresAt = 0
           this.user = undefined
           this.loggedIn = false
         } else {
           this.#rememberFailure(error)
         }
+      }
+    } else if (this.record?.refreshCookie) {
+      this.refreshCookie = String(this.record.refreshCookie)
+      this.refreshExpiresAt = Number(this.record.refreshExpiresAt) || 0
+    }
+
+    if (!this.loggedIn && this.refreshCookie !== '') {
+      try {
+        await this.#refreshSession()
+        await this.#loadMe()
+      } catch (error) {
+        this.#rememberFailure(error)
       }
     }
 
@@ -222,12 +315,15 @@ class FishPiChat {
 
     this.initialized = true
     if (this.loggedIn && this.realtime === undefined) this.#startRealtime()
+    this.#startUpdateWatch()
     this.#emitState()
   }
 
   /** Release the socket and every held event request. */
   dispose() {
     this.stopped = true
+    clearInterval(this.updateTimer)
+    this.updateTimer = undefined
     this.realtime?.stop()
     this.realtime = undefined
     this.hub.dispose()
@@ -246,8 +342,158 @@ class FishPiChat {
       cursor: this.hub.seq,
       mfaRequired: this.lastError?.code === 'mfa_required',
       error: this.lastError === undefined ? null : { code: this.lastError.code, message: this.lastError.message },
+      persistent: this.record?.refreshCookie !== undefined && this.record.refreshCookie !== '',
+      refreshExpiresAt: this.refreshExpiresAt || null,
+      update: this.updateState(),
+      hostVersion: PLUGIN_VERSION,
       siteUrl: DEFAULT_SITE,
     }
+  }
+
+  /** @returns {Record<string, unknown>} the latest npm version check, safe for the browser. */
+  updateState() {
+    return {
+      current: this.updateInfo.current,
+      latest: this.updateInfo.latest,
+      available: this.updateInfo.available,
+      localAhead: this.updateInfo.localAhead === true,
+      url: this.updateInfo.url,
+      source: this.updateInfo.source,
+      checkedAt: this.updateInfo.checkedAt,
+      error: this.updateInfo.error === null || this.updateInfo.error === undefined
+        ? null
+        : { code: this.updateInfo.error.code, message: this.updateInfo.error.message },
+    }
+  }
+
+  /**
+   * Ask the npm registry for the latest published version and publish the result.
+   * Failures are returned as state rather than thrown, so a reminder never blocks
+   * chat operations.
+   * @returns {Promise<Record<string, unknown>>} the browser-safe update state.
+   */
+  async checkForUpdate() {
+    return this.#runUpdateCheck()
+  }
+
+  /**
+   * One shared registry check. Concurrent callers await the same request.
+   * @returns {Promise<Record<string, unknown>>} the browser-safe update state.
+   */
+  async #runUpdateCheck() {
+    if (this.updateTask !== undefined) return this.updateTask
+    this.updateTask = (async () => {
+      const checkedAt = Date.now()
+      try {
+        const latest = await this.#fetchLatestVersion()
+        this.updateInfo = {
+          current: PLUGIN_VERSION,
+          latest: latest.version,
+          available: compareVersions(PLUGIN_VERSION, latest.version) < 0,
+          localAhead: compareVersions(PLUGIN_VERSION, latest.version) > 0,
+          url: `https://www.npmjs.com/package/${PACKAGE_NAME}/v/${encodeURIComponent(latest.version)}`,
+          source: latest.source,
+          checkedAt,
+          error: null,
+        }
+      } catch (error) {
+        this.updateInfo = {
+          ...this.updateInfo,
+          checkedAt,
+          error: {
+            code: 'update_check_failed',
+            message: error instanceof Error && error.message !== '' ? error.message : '检查更新失败',
+          },
+        }
+      }
+      this.lastUpdateCheckAt = checkedAt
+      this.#emitState()
+      return this.updateState()
+    })()
+    try {
+      return await this.updateTask
+    } finally {
+      this.updateTask = undefined
+    }
+  }
+
+  /**
+   * Install the newest published version through the DSH plugin manager.
+   * Returns a clear refusal for development links and Git installs, which the
+   * manager does not update from a registry version.
+   * @returns {Promise<Record<string, unknown>>}
+   */
+  async installUpdate() {
+    const version = this.updateInfo.available === true ? this.updateInfo.latest : ''
+    if (version === '') throw new FishPiError('当前没有可安装的新版本', { code: 'no_update', status: 409 })
+    const manager = this.ctx.get('pluginManager')
+    if (manager === undefined || typeof manager.listBundles !== 'function' || typeof manager.updateBundle !== 'function') {
+      throw new FishPiError('当前 DSH 没有可用的插件管理器', { code: 'update_unavailable', status: 503 })
+    }
+    let bundle
+    try {
+      const bundles = await manager.listBundles()
+      bundle = Array.isArray(bundles) ? bundles.find(item => item?.name === PACKAGE_NAME) : undefined
+    } catch (error) {
+      throw new FishPiError('无法读取插件安装状态', { code: 'update_failed', cause: error })
+    }
+    if (bundle === undefined) throw new FishPiError('找不到已安装的插件', { code: 'update_unavailable', status: 503 })
+    if (bundle.update !== 'registry') {
+      throw new FishPiError('当前是本地开发或 Git 安装，请在 Plugins 页面手动更新', { code: 'not_updatable', status: 409 })
+    }
+    const result = await manager.updateBundle(PACKAGE_NAME, version)
+    this.updateInfo = { ...this.updateInfo, available: false }
+    this.#emitState()
+    return { ok: true, version, result }
+  }
+
+  /** @returns {Promise<{ version: string, source: string }>} the newest published version. */
+  async #fetchLatestVersion() {
+    if (typeof globalThis.fetch !== 'function') throw new Error('当前运行环境不支持网络请求')
+    let lastError
+    for (const endpoint of UPDATE_SOURCES) {
+      try {
+        const signal = typeof AbortSignal.timeout === 'function'
+          ? AbortSignal.timeout(UPDATE_REQUEST_TIMEOUT_MS)
+          : undefined
+        const response = await globalThis.fetch(endpoint.url, {
+          headers: { accept: 'application/json' },
+          credentials: 'omit',
+          signal,
+        })
+        if (!response.ok) {
+          lastError = new Error(`HTTP ${response.status}`)
+          continue
+        }
+        let payload
+        try {
+          payload = await response.json()
+        } catch {
+          lastError = new Error('npm 返回了无法解析的响应')
+          continue
+        }
+        const version = typeof payload?.version === 'string' ? payload.version.trim() : ''
+        if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u.test(version)) {
+          lastError = new Error('npm 返回了无法识别的版本')
+          continue
+        }
+        return { version, source: endpoint.source }
+      } catch (error) {
+        lastError = error
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error('无法连接 npm registry')
+  }
+
+  /** Start the periodic npm reminder; one check per process interval. */
+  #startUpdateWatch() {
+    if (!this.updateCheckEnabled || this.updateTimer !== undefined) return
+    void this.checkForUpdate()
+    this.updateTimer = setInterval(() => {
+      if (Date.now() - this.lastUpdateCheckAt < UPDATE_CHECK_INTERVAL_MS) return
+      void this.checkForUpdate()
+    }, UPDATE_CHECK_INTERVAL_MS)
+    this.updateTimer.unref?.()
   }
 
   /**
@@ -269,7 +515,7 @@ class FishPiChat {
       if (grant?.mfaRequired === true || grant?.mfa_required === true) {
         return { ok: false, code: 'mfa_required', message: '该账号启用了两步验证，请输入验证码', mfaRequired: true }
       }
-      await this.#applyLogin(grant, { nameOrEmail, passwordMd5, remember })
+      await this.#applyLogin(grant, { remember })
       return { ok: true, user: this.user }
     } catch (error) {
       if (error instanceof FishPiError && error.code === 'mfa_required') {
@@ -288,15 +534,25 @@ class FishPiChat {
 
   /** Forget the account and its stored credentials. */
   async logout() {
+    const cookie = this.refreshCookie !== ''
+      ? this.refreshCookie
+      : (typeof this.record?.refreshCookie === 'string' ? this.record.refreshCookie : '')
     this.loggedIn = false
     this.user = undefined
     this.record = undefined
     this.api.setToken('')
     this.tokenExpiresAt = 0
+    this.refreshCookie = ''
+    this.refreshExpiresAt = 0
     this.lastError = undefined
     this.realtime?.stop()
     this.realtime = undefined
     this.connectionState = 'disconnected'
+    if (cookie !== '') {
+      void this.api.logoutWebsite(cookie).catch(error => {
+        warn(this.ctx, 'could not end the remote session', error)
+      })
+    }
     try {
       await this.ctx.credentials.deleteRecord(CREDENTIAL_KEY)
     } catch (error) {
@@ -552,6 +808,22 @@ class FishPiChat {
   }
 
   /**
+   * Recall one of the current account's messages.
+   * @param {{ id?: unknown, requestId?: unknown }} body - recall request.
+   * @returns {Promise<Record<string, unknown>>}
+   */
+  async recall(body) {
+    const id = typeof body.id === 'string' && /^\d+$/u.test(body.id) ? body.id : ''
+    if (id === '') throw new FishPiError('消息 ID 不正确', { code: 'invalid_input', status: 400 })
+    const rawId = typeof body.requestId === 'string' ? body.requestId.replace(/[^A-Za-z0-9_-]/gu, '').slice(0, 64) : ''
+    const requestId = rawId === '' ? crypto.randomUUID() : rawId
+    const result = await this.#withAuth(() => this.api.revokeMessage(id, `fishpi-chat-revoke-${requestId}`))
+    if (result?.removed === false) throw new FishPiError('消息未能撤回', { code: 'recall_failed' })
+    this.hub.emit('message.deleted', { messageId: id })
+    return { ok: true, id, removed: true }
+  }
+
+  /**
    * Send one message with a caller-stable request id.
    * @param {{ content?: unknown, requestId?: unknown }} body - composer payload.
    * @returns {Promise<Record<string, unknown>>}
@@ -605,38 +877,64 @@ class FishPiChat {
   }
 
   /**
-   * @param {{ accessToken?: string, expiresIn?: number }} grant - a successful login response.
-   * @param {{ nameOrEmail: string, passwordMd5: string, remember: boolean }} account - the credentials to keep.
+   * @param {{ accessToken?: string, expiresIn?: number, refreshExpiresIn?: number, refreshCookie?: string }} grant - a successful login or refresh response.
+   * @param {{ remember: boolean }} account - whether to persist the refresh cookie.
    */
   async #applyLogin(grant, account) {
     const token = typeof grant?.accessToken === 'string' ? grant.accessToken : ''
     if (token === '') throw new FishPiError('登录响应缺少访问令牌', { code: 'invalid_response' })
     this.api.setToken(token)
     this.tokenExpiresAt = Number(grant?.expiresIn) > 0 ? Date.now() + Number(grant.expiresIn) * 1000 : 0
+    this.refreshCookie = typeof grant?.refreshCookie === 'string' ? grant.refreshCookie : ''
+    this.refreshExpiresAt = Number(grant?.refreshExpiresIn) > 0 ? Date.now() + Number(grant.refreshExpiresIn) * 1000 : 0
+    if (this.refreshCookie === '') {
+      warn(this.ctx, 'login response did not include the refresh cookie; the session will expire with the access token', new Error('missing fp_v3_refresh'))
+    }
+    this.record = {
+      version: 2,
+      accessToken: token,
+      tokenExpiresAt: this.tokenExpiresAt,
+      refreshExpiresAt: this.refreshExpiresAt,
+      refreshCookie: account.remember && this.refreshCookie !== '' ? this.refreshCookie : undefined,
+      remember: account.remember,
+    }
+    // Keep the fresh refresh credential even if the profile read fails; the
+    // next Host start can recover the session without another sign-in.
+    await this.#persist()
+    try {
+      await this.#loadMe()
+    } catch (error) {
+      if (error instanceof FishPiError && (error.status === 401 || error.code === 'unauthorized')) {
+        await this.#clearSession()
+      }
+      throw error
+    }
+    if (this.record !== undefined) {
+      this.record.user = this.user
+      await this.#persist()
+    }
+    this.#startRealtime()
+    this.#emitState()
+  }
+
+  /** Read `/api/v3/me` and publish the signed-in identity. */
+  async #loadMe() {
     const me = await this.api.me()
     const user = normalizeMe(me)
     if (user === undefined) throw new FishPiError('无法读取账号资料', { code: 'invalid_response' })
     this.user = user
     this.loggedIn = true
     this.lastError = undefined
-    this.record = {
-      version: 1,
-      nameOrEmail: account.nameOrEmail,
-      passwordMd5: account.remember ? account.passwordMd5 : undefined,
-      remember: account.remember,
-      accessToken: token,
-      tokenExpiresAt: this.tokenExpiresAt,
-      user,
+    if (this.record !== undefined) {
+      this.record.user = user
+      await this.#persist()
     }
-    await this.#persist()
-    this.#startRealtime()
-    this.#emitState()
   }
 
   /**
    * @param {string} nameOrEmail - stored account name.
    * @param {string} passwordMd5 - stored digest.
-   * @param {boolean} remember - whether to keep the digest.
+   * @param {boolean} remember - whether to keep the new refresh cookie.
    */
   async #loginWithDigest(nameOrEmail, passwordMd5, remember) {
     if (this.loginTask !== undefined) {
@@ -645,7 +943,7 @@ class FishPiChat {
     }
     this.loginTask = (async () => {
       const grant = await this.api.login({ nameOrEmail, userPassword: passwordMd5 })
-      await this.#applyLogin(grant, { nameOrEmail, passwordMd5, remember })
+      await this.#applyLogin(grant, { remember })
     })()
     try {
       await this.loginTask
@@ -655,10 +953,105 @@ class FishPiChat {
   }
 
   /**
+   * Rotate the access token with the stored refresh cookie.
+   *
+   * Refreshes are serialized because fishpi rotates the cookie and invalidates
+   * the previous value; two concurrent refreshes would revoke the session.
+   */
+  async #refreshSession() {
+    if (this.refreshTask !== undefined) {
+      await this.refreshTask
+      return
+    }
+    const cookie = this.refreshCookie !== ''
+      ? this.refreshCookie
+      : (typeof this.record?.refreshCookie === 'string' ? this.record.refreshCookie : '')
+    if (cookie === '') {
+      throw new FishPiError('登录状态已失效，请重新登录', { code: 'unauthorized', status: 401 })
+    }
+    if (this.refreshExpiresAt > 0 && this.refreshExpiresAt <= Date.now()) {
+      await this.#clearSession()
+      throw new FishPiError('登录状态已过期，请重新登录', { code: 'unauthorized', status: 401 })
+    }
+
+    this.refreshTask = (async () => {
+      let grant
+      try {
+        grant = await this.api.refreshWebsite(cookie)
+      } catch (error) {
+        if (error instanceof FishPiError && (error.status === 401 || error.code === 'unauthorized')) {
+          await this.#clearSession()
+        }
+        throw error
+      }
+      const token = typeof grant?.accessToken === 'string' ? grant.accessToken : ''
+      if (token === '') {
+        await this.#clearSession()
+        throw new FishPiError('刷新响应缺少访问令牌', { code: 'invalid_response' })
+      }
+      this.api.setToken(token)
+      this.tokenExpiresAt = Number(grant.expiresIn) > 0 ? Date.now() + Number(grant.expiresIn) * 1000 : 0
+      if (typeof grant.refreshCookie === 'string' && grant.refreshCookie !== '') {
+        this.refreshCookie = grant.refreshCookie
+      }
+      if (Number(grant.refreshExpiresIn) > 0) {
+        this.refreshExpiresAt = Date.now() + Number(grant.refreshExpiresIn) * 1000
+      }
+      this.loggedIn = true
+      this.lastError = undefined
+      if (this.record !== undefined) {
+        this.record.version = 2
+        this.record.accessToken = token
+        this.record.tokenExpiresAt = this.tokenExpiresAt
+        this.record.refreshExpiresAt = this.refreshExpiresAt
+        if (this.record.remember !== false && this.refreshCookie !== '') {
+          this.record.refreshCookie = this.refreshCookie
+        }
+        await this.#persist()
+      }
+      this.#emitState()
+    })()
+    try {
+      await this.refreshTask
+    } finally {
+      this.refreshTask = undefined
+    }
+  }
+
+  /** Drop the local session and its credential record. */
+  async #clearSession() {
+    this.loggedIn = false
+    this.user = undefined
+    this.record = undefined
+    this.api.setToken('')
+    this.tokenExpiresAt = 0
+    this.refreshCookie = ''
+    this.refreshExpiresAt = 0
+    this.realtime?.stop()
+    this.realtime = undefined
+    this.connectionState = 'disconnected'
+    try {
+      await this.ctx.credentials.deleteRecord(CREDENTIAL_KEY)
+    } catch (error) {
+      warn(this.ctx, 'could not delete expired credentials', error)
+    }
+    this.#emitState()
+  }
+
+  /**
    * @param {boolean} force - renew even when the current token looks fresh.
    */
   async #ensureAuth(force) {
     if (this.loggedIn && !force && (this.tokenExpiresAt === 0 || this.tokenExpiresAt > Date.now() + 60_000)) return
+    if (this.refreshCookie !== '' || typeof this.record?.refreshCookie === 'string') {
+      try {
+        await this.#refreshSession()
+        return
+      } catch (error) {
+        this.#rememberFailure(error)
+        throw error
+      }
+    }
     if (this.record?.passwordMd5) {
       try {
         await this.#loginWithDigest(String(this.record.nameOrEmail ?? ''), String(this.record.passwordMd5), this.record.remember !== false)
@@ -865,9 +1258,9 @@ class FishPiChat {
  * Host plugin body.
  * @param {import('@deepseek-ai/cordis').Context} ctx - loader context with `connection` and `credentials`.
  */
-export function apply(ctx) {
+export function apply(ctx, config = {}) {
   const hub = new EventHub({ limit: EVENT_LOG_LIMIT })
-  const chat = new FishPiChat({ ctx, hub })
+  const chat = new FishPiChat({ ctx, hub, updateCheck: config?.updateCheck !== false })
 
   /**
    * @param {string} path - exact path below `/api`.
@@ -911,6 +1304,13 @@ export function apply(ctx) {
   route('/send', ['POST'], async request => {
     try {
       return json(await chat.send(await readJson(request)))
+    } catch (error) {
+      return failure(error)
+    }
+  })
+  route('/recall', ['POST'], async request => {
+    try {
+      return json(await chat.recall(await readJson(request)))
     } catch (error) {
       return failure(error)
     }
@@ -972,6 +1372,20 @@ export function apply(ctx) {
   route('/online', ['GET'], async () => {
     try {
       return json(await chat.online())
+    } catch (error) {
+      return failure(error)
+    }
+  })
+  route('/update/install', ['POST'], async () => {
+    try {
+      return json(await chat.installUpdate())
+    } catch (error) {
+      return failure(error)
+    }
+  })
+  route('/update/check', ['POST'], async () => {
+    try {
+      return json({ ok: true, update: await chat.checkForUpdate() })
     } catch (error) {
       return failure(error)
     }

@@ -70,10 +70,10 @@ window.__ModuleLoader__.load({
       'login.account': '账号或邮箱',
       'login.password': '密码',
       'login.mfa': '两步验证码（选填）',
-      'login.remember': '记住密码（仅保存 MD5 摘要）',
+      'login.remember': '在此设备保持登录',
       'login.submit': '登录',
       'login.busy': '登录中…',
-      'login.hint': '账号凭据保存在本机 DSH 凭据库，不会写进配置文件。',
+      'login.hint': '登录后保存鱼排刷新凭据，重启 DSH 后无需重新登录。',
       'login.register': '去注册',
       'login.needMfa': '该账号启用了两步验证，请输入验证码后重试。',
       logout: '退出登录',
@@ -89,8 +89,25 @@ window.__ModuleLoader__.load({
       'settings.notifications.denied': '浏览器拒绝了通知权限。',
       'settings.notifications.unsupported': '当前环境不支持系统通知。',
       'error.crash': '聊天室渲染失败',
-      'settings.credentialNote': '登录凭据保存在本机 DSH 凭据库。勾选“记住密码”时保存密码的 MD5 摘要，用于访问令牌过期后自动重新登录；开启两步验证的账号仍需手动输入验证码。',
-      'settings.version': '插件版本 0.1.0',
+      'host.restart': '插件 Host 还是旧版本，撤回和管理员撤回暂不可用。请完全退出 DSH 再重新打开。',
+      'settings.update': '插件更新',
+      'settings.update.versions': '当前 {current} · {latest}',
+      'settings.update.check': '检查更新',
+      'settings.update.checking': '检查中…',
+      'settings.update.install': '立即安装',
+      'settings.update.installing': '安装中…',
+      'message.actions': '消息操作',
+      'message.quoteShort': '引',
+      'message.recallShort': '撤',
+      'message.recallConfirmShort': '确',
+      'message.mentionShort': '@',
+      'message.repeatShort': '+1',
+      'message.quote': '引用这条消息',
+      'message.recall': '撤回这条消息（再次点击确认，撤回可能消耗积分）',
+      'message.recallModerate': '撤回这条消息（管理员/OP/纪律委员操作；再次点击确认）',
+      'message.recallConfirm': '再次点击确认撤回',
+      'message.mention': '在输入框艾特这条消息的作者',
+      'message.repeat': '复读 +1',
       'composer.placeholder': '说点什么…',
       'composer.addImage': '添加图片',
       'composer.uploading': '正在上传图片…',
@@ -159,6 +176,10 @@ window.__ModuleLoader__.load({
       'error.rate': '操作过于频繁，请稍后再试。',
       'error.server': '摸鱼派服务暂时不可用。',
       'error.upload': '图片上传失败，请稍后重试。',
+      'error.notRemovable': '这条消息不能撤回（红包等特殊消息不支持撤回）。',
+      'error.notFound': '消息不存在或已被撤回。',
+      'error.recallFailed': '撤回失败，请稍后重试。',
+      'error.hostRestart': '插件 Host 还是旧版本，请完全退出 DSH 再重新打开。',
       'error.generic': '操作失败，请稍后重试。',
       'error.dismiss': '关闭',
       'card.redPacket': '红包',
@@ -192,10 +213,10 @@ window.__ModuleLoader__.load({
       'login.account': 'Username or email',
       'login.password': 'Password',
       'login.mfa': 'Two-step code (optional)',
-      'login.remember': 'Remember password (MD5 digest only)',
+      'login.remember': 'Stay signed in on this device',
       'login.submit': 'Sign in',
       'login.busy': 'Signing in…',
-      'login.hint': 'Credentials stay in the local DSH credential store and never enter configuration.',
+      'login.hint': 'The FishPi refresh credential is saved locally, so restarting DSH does not require another sign-in.',
       'login.register': 'Create account',
       'login.needMfa': 'This account uses two-step verification. Enter the code and try again.',
       logout: 'Sign out',
@@ -211,8 +232,25 @@ window.__ModuleLoader__.load({
       'settings.notifications.denied': 'The browser denied notification permission.',
       'settings.notifications.unsupported': 'System notifications are unavailable here.',
       'error.crash': 'The chat panel failed to render',
-      'settings.credentialNote': 'Credentials stay in the local DSH credential store. With “Remember password”, the MD5 digest is saved so an expired access token can sign in again automatically. Accounts with two-step verification still need the code.',
-      'settings.version': 'Plugin version 0.1.0',
+      'host.restart': 'The plugin Host is still on an older build; recall and moderator recall are unavailable. Quit and reopen DSH completely.',
+      'settings.update': 'Plugin updates',
+      'settings.update.versions': 'Current {current} · {latest}',
+      'settings.update.check': 'Check for updates',
+      'settings.update.checking': 'Checking…',
+      'settings.update.install': 'Install now',
+      'settings.update.installing': 'Installing…',
+      'message.actions': 'Message actions',
+      'message.quoteShort': 'Q',
+      'message.recallShort': 'R',
+      'message.recallConfirmShort': 'C',
+      'message.mentionShort': '@',
+      'message.repeatShort': '+1',
+      'message.quote': 'Quote this message',
+      'message.recall': 'Recall this message (click again to confirm; may cost points)',
+      'message.recallModerate': 'Recall this message (moderator action; click again to confirm)',
+      'message.recallConfirm': 'Click again to confirm recall',
+      'message.mention': 'Mention this message’s author in the composer',
+      'message.repeat': 'Repeat +1',
       'composer.placeholder': 'Say something…',
       'composer.addImage': 'Add images',
       'composer.uploading': 'Uploading images…',
@@ -281,6 +319,10 @@ window.__ModuleLoader__.load({
       'error.rate': 'Too many requests. Wait a moment and try again.',
       'error.server': 'The FishPi service is temporarily unavailable.',
       'error.upload': 'Image upload failed. Try again.',
+      'error.notRemovable': 'This message cannot be recalled (red packets and other special messages are excluded).',
+      'error.notFound': 'The message no longer exists or was already recalled.',
+      'error.recallFailed': 'Recall failed. Try again.',
+      'error.hostRestart': 'The plugin Host is still on an older build. Quit and reopen DSH completely.',
       'error.generic': 'The operation failed. Try again.',
       'error.dismiss': 'Dismiss',
       'card.redPacket': 'Red packet',
@@ -648,6 +690,11 @@ window.__ModuleLoader__.load({
         case 'insufficient_points': return t('error.points')
         case 'rate_limited': return t('error.rate')
         case 'upload_failed': return t('error.upload')
+        case 'message_not_removable': return t('error.notRemovable')
+        case 'http_404':
+        case 'not_found': return t('error.notFound')
+        case 'recall_failed': return t('error.recallFailed')
+        case 'host_restart': return t('error.hostRestart')
         case 'realtime_unavailable':
         case 'internal':
         case 'http_500':
@@ -666,6 +713,7 @@ window.__ModuleLoader__.load({
       let state = {
         loaded: false,
         ready: false,
+        hostVersion: '',
         loggedIn: false,
         user: null,
         connection: 'disconnected',
@@ -674,6 +722,7 @@ window.__ModuleLoader__.load({
         loadingMessages: false,
         loadingOlder: false,
         sending: false,
+        recalling: false,
         uploadingImages: false,
         loggingIn: false,
         loginError: null,
@@ -685,6 +734,9 @@ window.__ModuleLoader__.load({
         unread: 0,
         chatVisible: false,
         error: null,
+        update: null,
+        checkingUpdate: false,
+        installingUpdate: false,
         siteUrl: 'https://fishpi.cn',
         prefs: readPrefs(),
         redPacketId: null,
@@ -707,6 +759,7 @@ window.__ModuleLoader__.load({
       let started = false
       let claimedUserId = ''
       let redPacketSeq = 0
+      let recallKey = { id: '', requestId: '' }
       const medalPending = new Set()
       const listeners = new Set()
       const store = {
@@ -806,6 +859,7 @@ window.__ModuleLoader__.load({
         set({
           loaded: true,
           ready: data.ready === true,
+          hostVersion: typeof data.hostVersion === 'string' ? data.hostVersion : '',
           loggedIn: data.loggedIn === true,
           user: data.user ?? null,
           connection: typeof data.connection === 'string' ? data.connection : state.connection,
@@ -813,11 +867,13 @@ window.__ModuleLoader__.load({
           mfaRequired: data.mfaRequired === true,
           siteUrl: typeof data.siteUrl === 'string' && data.siteUrl !== '' ? data.siteUrl : state.siteUrl,
           error: data.error === undefined ? state.error : data.error,
+          update: data.update === undefined ? state.update : data.update,
           claimedPacketIds,
         })
         if (was && !data.loggedIn) {
           set({
             messages: [],
+            recalling: false,
             unread: 0,
             topic: '',
             online: 0,
@@ -1038,6 +1094,7 @@ window.__ModuleLoader__.load({
           loggedIn: false,
           user: null,
           messages: [],
+          recalling: false,
           unread: 0,
           topic: '',
           online: 0,
@@ -1199,6 +1256,49 @@ window.__ModuleLoader__.load({
       }
 
       /**
+       * Recall one of the current account's messages.
+       * @param {string} id - message id.
+       * @returns {Promise<{ok: boolean}>} whether the Host withdrew the message.
+       */
+      async function recall(id) {
+        if (state.recalling) return { ok: false }
+        const clean = String(id)
+        if (!/^\d+$/u.test(clean)) return { ok: false }
+        if (recallKey.id !== clean) recallKey = { id: clean, requestId: uuid() }
+        set({ recalling: true, error: null })
+        try {
+          await call('recall', { method: 'POST', body: { id: clean, requestId: recallKey.requestId } })
+          recallKey = { id: '', requestId: '' }
+          set({
+            recalling: false,
+            messages: state.messages.filter(message => message.id !== clean),
+          })
+          return { ok: true }
+        } catch (error) {
+          const code = error.code ?? 'generic'
+          if ((code === 'http_404' || code === 'not_found') && state.hostVersion !== '') {
+            // The message was already withdrawn (for example by another
+            // client) but is still in this local window. Drop it instead of
+            // surfacing a misleading failure.
+            recallKey = { id: '', requestId: '' }
+            set({
+              recalling: false,
+              messages: state.messages.filter(message => message.id !== clean),
+              error: null,
+            })
+            return { ok: true, removed: true }
+          }
+          set({
+            recalling: false,
+            error: state.hostVersion === ''
+              ? { code: 'host_restart', message: error.message }
+              : { code, message: error.message },
+          })
+          return { ok: false }
+        }
+      }
+
+      /**
        * @param {string} content - composer text.
        * @returns {Promise<{ok: boolean}>}
        */
@@ -1253,6 +1353,62 @@ window.__ModuleLoader__.load({
       /** Clear the inline failure banner. */
       function clearError() {
         set({ error: null })
+      }
+
+      /**
+       * Ask the Host to re-check npm and publish the result.
+       * @returns {Promise<{ok: boolean}>} whether the check completed.
+       */
+      async function checkUpdate() {
+        if (state.checkingUpdate) return { ok: false }
+        set({ checkingUpdate: true })
+        try {
+          const data = await call('update/check', { method: 'POST', body: {} })
+          set({
+            checkingUpdate: false,
+            update: data.update === undefined ? state.update : data.update,
+          })
+          return { ok: true }
+        } catch (error) {
+          set({
+            checkingUpdate: false,
+            update: {
+              ...(state.update ?? {
+                current: '',
+                latest: '',
+                available: false,
+                localAhead: false,
+                url: '',
+                source: '',
+                checkedAt: 0,
+              }),
+              checkedAt: Date.now(),
+              error: { code: error.code ?? 'generic', message: error.message },
+            },
+          })
+          return { ok: false }
+        }
+      }
+
+      /** Install the available npm update through the Host plugin manager. */
+      async function installUpdate() {
+        if (state.installingUpdate) return { ok: false }
+        set({ installingUpdate: true, error: null })
+        try {
+          await call('update/install', { method: 'POST', body: {} })
+          set({
+            installingUpdate: false,
+            update: state.update === null ? state.update : { ...state.update, available: false },
+          })
+          window.setTimeout(() => { window.location.reload() }, 300)
+          return { ok: true }
+        } catch (error) {
+          set({
+            installingUpdate: false,
+            error: { code: error.code ?? 'generic', message: error.message },
+          })
+          return { ok: false }
+        }
       }
 
       /**
@@ -1417,6 +1573,7 @@ window.__ModuleLoader__.load({
         login,
         logout,
         send,
+        recall,
         suggestUsers,
         openUserInfo,
         closeUserInfo,
@@ -1431,6 +1588,8 @@ window.__ModuleLoader__.load({
         setChatVisible,
         clearUnreadIfVisible,
         clearError,
+        checkUpdate,
+        installUpdate,
         openRedPacket,
         closeRedPacket,
         claimRedPacket,
@@ -1775,9 +1934,47 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * A run of identical messages, rendered as whole cards where each card
+     * overlaps the previous one. The front (latest) card keeps the body and
+     * actions; the earlier cards keep their avatar/name header visible.
+     * @param {{messages: object[], mode: string, t: Function, siteUrl: string, actions: object|null}} props - the folded run.
+     */
+    function MessageStack({ messages, mode, t, siteUrl, actions, medalIcons }) {
+      const offset = 33
+      return h('div', { className: 'fc-msg-stack-row' },
+        h('div', {
+          className: 'fc-msg-stack',
+          style: { paddingTop: `${(messages.length - 1) * offset}px` },
+        },
+          messages.map((message, index) => {
+            const front = index === messages.length - 1
+            return h('div', {
+              key: message.id,
+              className: `fc-stack-card${front ? ' fc-stack-card-front' : ''}`,
+              style: front
+                ? { zIndex: index + 1 }
+                : { top: `${index * offset}px`, zIndex: index + 1 },
+            },
+              h(MessageRow, {
+                message,
+                own: false,
+                grouped: false,
+                mode,
+                t,
+                siteUrl,
+                medalIcons: medalIcons[message.author?.userName ?? ''] ?? [],
+                actions: front ? actions : null,
+              }),
+            )
+          }),
+        ),
+      )
+    }
+
+    /**
      * @param {{message: object, own: boolean, grouped: boolean, mode: string, t: Function}} props - one row.
      */
-    function MessageRow({ message, own, grouped, mode, t, siteUrl, medalIcons = [] }) {
+    function MessageRow({ message, own, grouped, mode, t, siteUrl, medalIcons = [], actions = null }) {
       if (message.type === 'system') {
         return h('div', { className: 'fc-system' }, message.text)
       }
@@ -1794,45 +1991,50 @@ window.__ModuleLoader__.load({
         })
         .filter(Boolean)
       const avatar = h(Avatar, { url: author.userAvatarURL ?? '', name: avatarName })
-      return h('div', { className: `fc-msg${own ? ' fc-own' : ''}${grouped ? ' fc-grouped' : ''}` },
-        grouped
-          ? h('span', { className: 'fc-avatar-spacer' })
-          : author.userName !== ''
-            ? h('button', {
-                type: 'button',
-                className: 'fc-avatar-button',
-                'aria-label': name,
-                onClick: () => { void sharedStore.openUserInfo(author.userName) },
-              }, avatar)
-            : avatar,
-        h('div', { className: 'fc-msg-body' },
+      return h('div', { className: `fc-msg-line${grouped ? ' fc-grouped' : ''}` },
+        h('div', { className: `fc-msg${own ? ' fc-own' : ''}${grouped ? ' fc-grouped' : ''}` },
           grouped
-            ? null
-            : h('div', { className: 'fc-msg-head' },
-                author.userName !== ''
-                  ? h('button', {
-                      type: 'button',
-                      className: 'fc-msg-name fc-user-link',
-                      onClick: () => { void sharedStore.openUserInfo(author.userName) },
-                    }, name)
-                  : h('span', { className: 'fc-msg-name' }, name),
-                resolvedMedals.length > 0
-                  ? h('span', { className: 'fc-msg-medals' },
-                      resolvedMedals.map((medal, index) => h('img', {
-                        key: medal.id || medal.name || index,
-                        className: 'fc-msg-medal',
-                        src: medal.url,
-                        alt: medal.name,
-                        title: [medal.name, medal.description].filter(Boolean).join(' · '),
-                        loading: 'lazy',
-                        referrerPolicy: 'no-referrer',
-                        onError: event => { event.currentTarget.style.display = 'none' },
-                      })),
-                    )
-                  : null,
-                h('time', { className: 'fc-msg-time', dateTime: new Date(message.createdAt).toISOString() }, clock(message.createdAt)),
-              ),
-          h('div', { className: 'fc-msg-content' }, h(MessageContent, { message, mode, t, siteUrl })),
+            ? h('span', { className: 'fc-avatar-spacer' })
+            : author.userName !== ''
+              ? h('button', {
+                  type: 'button',
+                  className: 'fc-avatar-button',
+                  'aria-label': name,
+                  onClick: () => { void sharedStore.openUserInfo(author.userName) },
+                }, avatar)
+              : avatar,
+          h('div', { className: 'fc-msg-body' },
+            grouped
+              ? null
+              : h('div', { className: 'fc-msg-head' },
+                  author.userName !== ''
+                    ? h('button', {
+                        type: 'button',
+                        className: 'fc-msg-name fc-user-link',
+                        onClick: () => { void sharedStore.openUserInfo(author.userName) },
+                      }, name)
+                    : h('span', { className: 'fc-msg-name' }, name),
+                  resolvedMedals.length > 0
+                    ? h('span', { className: 'fc-msg-medals' },
+                        resolvedMedals.map((medal, index) => h('img', {
+                          key: medal.id || medal.name || index,
+                          className: 'fc-msg-medal',
+                          src: medal.url,
+                          alt: medal.name,
+                          title: [medal.name, medal.description].filter(Boolean).join(' · '),
+                          loading: 'lazy',
+                          referrerPolicy: 'no-referrer',
+                          onError: event => { event.currentTarget.style.display = 'none' },
+                        })),
+                      )
+                    : null,
+                  h('time', { className: 'fc-msg-time', dateTime: new Date(message.createdAt).toISOString() }, clock(message.createdAt)),
+                ),
+            h('div', { className: 'fc-msg-content-row' },
+              h('div', { className: 'fc-msg-content' }, h(MessageContent, { message, mode, t, siteUrl })),
+              actions,
+            ),
+          ),
         ),
       )
     }
@@ -1965,6 +2167,17 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * @param {Function} t - bound translate.
+     * @param {object|null|undefined} update - Host update state.
+     * @returns {string} current and npm versions, nothing else.
+     */
+    function updateVersions(t, update) {
+      const current = typeof update?.current === 'string' && update.current !== '' ? update.current : '—'
+      const latest = typeof update?.latest === 'string' && update.latest !== '' ? update.latest : '—'
+      return t('settings.update.versions', { current, latest })
+    }
+
+    /**
      * @param {{t: Function}} props - the Settings section page.
      */
     function SettingsSection({ t }) {
@@ -2012,6 +2225,9 @@ window.__ModuleLoader__.load({
                 onClick: () => store.clearError(),
               }, '×'),
             ),
+        state.ready && state.hostVersion === ''
+          ? h('div', { className: 'fc-banner', role: 'alert' }, h('span', null, t('host.restart')))
+          : null,
         h('section', { className: 'fc-section' },
           h('h2', { className: 'fc-section-title' }, t('settings.account')),
           h(AccountCard, { t }),
@@ -2053,8 +2269,29 @@ window.__ModuleLoader__.load({
             ? h('p', { className: 'fc-error', role: 'alert' }, supported ? t('settings.notifications.denied') : t('settings.notifications.unsupported'))
             : null,
         ),
-        h('p', { className: 'fc-note' }, t('settings.credentialNote')),
-        h('p', { className: 'fc-note' }, t('settings.version')),
+        h('section', { className: 'fc-section' },
+          h('div', { className: 'fc-row' },
+            h('div', { className: 'fc-row-body' },
+              h('div', { className: 'fc-row-title' }, t('settings.update')),
+              h('div', { className: 'fc-hint' }, updateVersions(t, state.update)),
+            ),
+            h('button', {
+              type: 'button',
+              className: 'fc-button',
+              disabled: state.checkingUpdate || state.installingUpdate,
+              onClick: () => {
+                if (state.update?.available === true) void store.installUpdate()
+                else void store.checkUpdate()
+              },
+            }, state.installingUpdate
+              ? t('settings.update.installing')
+              : state.checkingUpdate
+                ? t('settings.update.checking')
+                : state.update?.available === true
+                  ? t('settings.update.install')
+                  : t('settings.update.check')),
+          ),
+        ),
       )
     }
 
@@ -2521,11 +2758,15 @@ window.__ModuleLoader__.load({
       const fileInputRef = useRef(null)
       const stickRef = useRef(true)
       const restoreRef = useRef(null)
+      const recallTimerRef = useRef()
+      const [recallingId, setRecallingId] = useState('')
 
       useEffect(() => {
         store.setChatVisible(visible)
         return () => { store.setChatVisible(false) }
       }, [visible])
+
+      useEffect(() => () => { clearTimeout(recallTimerRef.current) }, [])
 
       useLayoutEffect(() => {
         const element = scrollRef.current
@@ -2716,6 +2957,146 @@ window.__ModuleLoader__.load({
         })
       }
 
+      const insertDraft = text => {
+        const element = textareaRef.current
+        const start = element?.selectionStart ?? draft.length
+        const end = element?.selectionEnd ?? draft.length
+        const next = draft.slice(0, start) + text + draft.slice(end)
+        setDraft(next)
+        requestAnimationFrame(() => {
+          const target = textareaRef.current
+          if (target === null) return
+          target.focus()
+          const position = start + text.length
+          target.setSelectionRange(position, position)
+          updateMention(next, position)
+        })
+      }
+
+      /** @param {object} message - one normalized message. @returns {string} source text for a quote. */
+      const quoteSource = message => {
+        let source = ''
+        if (message.type === 'text') {
+          source = typeof message.content === 'string' ? message.content : ''
+          if (source.trim() === '' && typeof message.contentHtml === 'string') source = plainFromHtml(message.contentHtml)
+        }
+        if (source.trim() === '') source = messageSummary(message, t)
+        source = source.replace(/\r\n/gu, '\n').trimEnd()
+        return source.length > 1000 ? `${source.slice(0, 1000)}…` : source
+      }
+
+      /** @param {object} message - one normalized message. */
+      const quoteMessage = message => {
+        const source = quoteSource(message)
+        if (source === '') return
+        const author = message.author?.userName ?? ''
+        const site = state.siteUrl.replace(/\/+$/u, '')
+        const link = `${site}/cr#chatroom${message.id}`
+        const attribution = author !== ''
+          ? `##### 引用 @${author} [↩](${link} "跳转至原消息")`
+          : `##### 引用 [↩](${link} "跳转至原消息")`
+        const quoted = source.split('\n').map(line => `> ${line}`).join('\n')
+        const base = draft.trim() === '' ? '' : `${draft.replace(/\s+$/u, '')}\n\n`
+        setDraft(`${base}${attribution}  \n${quoted}\n`)
+        closeMention()
+        requestAnimationFrame(() => {
+          const element = textareaRef.current
+          if (element === null) return
+          element.focus()
+          const position = element.value.length
+          element.setSelectionRange(position, position)
+        })
+      }
+
+      /** @param {object} message - one normalized message. */
+      const mentionAuthor = message => {
+        const userName = message.author?.userName ?? ''
+        if (userName !== '') insertDraft(`@${userName} `)
+      }
+
+      /** @param {object} message - one normalized text message. */
+      const repeatMessage = message => {
+        if (state.sending) return
+        const content = typeof message.content === 'string' ? message.content : ''
+        if (message.type !== 'text' || content.trim() === '') return
+        void store.send(content)
+      }
+
+      /** @param {object} message - one normalized message. */
+      const requestRecall = message => {
+        if (state.recalling) return
+        if (recallingId !== message.id) {
+          clearTimeout(recallTimerRef.current)
+          setRecallingId(message.id)
+          recallTimerRef.current = window.setTimeout(() => setRecallingId(''), 4000)
+          return
+        }
+        clearTimeout(recallTimerRef.current)
+        recallTimerRef.current = undefined
+        setRecallingId('')
+        void store.recall(message.id)
+      }
+
+      /** @param {object} message - one normalized message. @returns {object|null} its hover actions. */
+      const messageActions = message => {
+        if (message.type === 'system') return null
+        const author = message.author ?? {}
+        const own = author.id !== undefined && author.id !== '' && author.id === state.user?.id
+        const canQuote = quoteSource(message) !== ''
+        const canModerate = state.user?.capabilities?.chatRevokeOthers === true
+        const canRecall = state.hostVersion !== ''
+          && (own || canModerate)
+          && message.type !== 'redPacket'
+          && /^\d+$/u.test(message.id)
+        const canMention = typeof author.userName === 'string' && author.userName !== '' && !own
+        const canRepeat = message.type === 'text' && typeof message.content === 'string' && message.content.trim() !== ''
+        if (!canQuote && !canRecall && !canMention && !canRepeat) return null
+        const pending = recallingId === message.id
+        return h('div', { className: 'fc-msg-actions', role: 'toolbar', 'aria-label': t('message.actions') },
+          canQuote
+            ? h('button', {
+                type: 'button',
+                className: 'fc-msg-action',
+                title: t('message.quote'),
+                'aria-label': t('message.quote'),
+                onClick: () => quoteMessage(message),
+              }, t('message.quoteShort'))
+            : null,
+          canRecall
+            ? h('button', {
+                type: 'button',
+                className: `fc-msg-action fc-msg-action-danger${pending ? ' fc-msg-action-pending' : ''}`,
+                disabled: state.recalling,
+                title: pending
+                  ? t('message.recallConfirm')
+                  : (own ? t('message.recall') : t('message.recallModerate')),
+                'aria-label': pending
+                  ? t('message.recallConfirm')
+                  : (own ? t('message.recall') : t('message.recallModerate')),
+                onClick: () => requestRecall(message),
+              }, pending ? t('message.recallConfirmShort') : t('message.recallShort'))
+            : null,
+          canMention
+            ? h('button', {
+                type: 'button',
+                className: 'fc-msg-action',
+                title: t('message.mention'),
+                'aria-label': t('message.mention'),
+                onClick: () => mentionAuthor(message),
+              }, t('message.mentionShort'))
+            : null,
+          canRepeat
+            ? h('button', {
+                type: 'button',
+                className: 'fc-msg-action',
+                title: t('message.repeat'),
+                'aria-label': t('message.repeat'),
+                onClick: () => repeatMessage(message),
+              }, t('message.repeatShort'))
+            : null,
+        )
+      }
+
       const retry = async () => {
         store.clearError()
         await store.syncAll()
@@ -2768,6 +3149,10 @@ window.__ModuleLoader__.load({
             }, '×'),
           )
 
+      const hostBanner = state.ready && state.hostVersion === ''
+        ? h('div', { className: 'fc-banner', role: 'alert' }, h('span', null, t('host.restart')))
+        : null
+
       if (!state.loaded) {
         return h('div', { className: 'fc-root' },
           h(Style), header, h('div', { className: 'fc-empty' }, t('loading')),
@@ -2779,6 +3164,7 @@ window.__ModuleLoader__.load({
           h(Style),
           header,
           errorBanner,
+          hostBanner,
           h('div', { className: 'fc-login-wrap' },
             h('div', { className: 'fc-login-title' }, t('login.title')),
             h(LoginForm, { t, compact: true }),
@@ -2788,31 +3174,73 @@ window.__ModuleLoader__.load({
         )
       }
 
+      // Fold a run of identical text messages into a stack of whole message
+      // cards: each card keeps its own avatar/name header and body, and every
+      // later card overlaps the previous one. The stack lives only in this
+      // render; nothing is persisted or sent.
+      const runs = []
+      let last = null
+      for (const message of state.messages) {
+        const repeat = message.type === 'text'
+          && typeof message.content === 'string'
+          && message.content.trim() !== ''
+          && last !== null
+          && last.type === 'text'
+          && typeof last.content === 'string'
+          && last.content === message.content
+          && dayKey(last.createdAt) === dayKey(message.createdAt)
+        if (repeat && runs.length > 0) runs[runs.length - 1].push(message)
+        else runs.push([message])
+        last = message
+      }
+      const display = runs.map(run => ({
+        message: run[0],
+        stack: { count: run.length, messages: run },
+      }))
+
       let previous = null
       const rows = []
-      for (const message of state.messages) {
+      for (const entry of display) {
+        const message = entry.message
         const authorId = message.author?.id ?? ''
         const authorName = message.author?.userName ?? ''
-        const dateChanged = previous === null || dayKey(message.createdAt) !== dayKey(previous.createdAt)
+        const dateChanged = previous === null || dayKey(message.createdAt) !== dayKey(previous.message.createdAt)
         if (dateChanged) rows.push(h('div', { className: 'fc-day', key: `day-${message.id}` }, dayLabel(message.createdAt, t)))
-        const grouped = !dateChanged
+        const stacked = entry.stack.messages.length > 1
+        const front = entry.stack.messages[entry.stack.messages.length - 1] ?? message
+        const grouped = !stacked
+          && !dateChanged
           && previous !== null
+          && previous.stack.count === 1
           && message.type === 'text'
-          && previous.type === 'text'
+          && previous.message.type === 'text'
           && authorId !== ''
-          && authorId === (previous.author?.id ?? '')
-          && message.createdAt - previous.createdAt < 5 * 60 * 1000
-        rows.push(h(MessageRow, {
-          key: message.id,
-          message,
-          own: authorId !== '' && authorId === state.user?.id,
-          grouped,
-          mode,
-          t,
-          siteUrl: state.siteUrl,
-          medalIcons: authorName !== '' ? state.medalIcons[authorName] ?? [] : [],
-        }))
-        previous = message
+          && authorId === (previous.message.author?.id ?? '')
+          && message.createdAt - previous.message.createdAt < 5 * 60 * 1000
+        if (stacked) {
+          rows.push(h(MessageStack, {
+            key: message.id,
+            messages: entry.stack.messages,
+            mode,
+            t,
+            siteUrl: state.siteUrl,
+            medalIcons: state.medalIcons,
+            actions: messageActions(front),
+          }))
+        } else {
+          rows.push(h(MessageRow, {
+            key: message.id,
+            message,
+            own: authorId !== '' && authorId === state.user?.id,
+            grouped,
+            mode,
+            t,
+            siteUrl: state.siteUrl,
+            medalIcons: authorName !== '' ? state.medalIcons[authorName] ?? [] : [],
+            actions: messageActions(message),
+          }))
+        }
+        previous = entry
       }
 
       const body = state.loadingMessages && state.messages.length === 0
@@ -2835,6 +3263,7 @@ window.__ModuleLoader__.load({
         h(Style),
         header,
         errorBanner,
+        hostBanner,
         body,
         state.messages.length > 0 && !atBottom
           ? h('button', {
@@ -3059,13 +3488,96 @@ window.__ModuleLoader__.load({
           overscroll-behavior: contain;
         }
         .fc-day { margin: 10px 0 6px; color: var(--dsw-alias-label-tertiary); font-size: 11px; text-align: center; }
-        .fc-msg { display: flex; gap: 8px; margin-top: 10px; }
-        .fc-msg.fc-grouped { margin-top: 3px; }
+        .fc-msg-line { position: relative; margin-top: 10px; }
+        .fc-msg-line.fc-grouped { margin-top: 3px; }
+        .fc-msg { display: flex; gap: 8px; }
+        .fc-msg-actions {
+          flex: none;
+          display: flex;
+          gap: 2px;
+          align-self: flex-start;
+          padding: 2px;
+          border: 1px solid var(--dsw-alias-border-l2);
+          border-radius: var(--dsw-radius-md);
+          background: var(--dsw-alias-bg-layer-2);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 120ms ease;
+        }
+        .fc-msg-body:hover .fc-msg-actions,
+        .fc-msg-body:focus-within .fc-msg-actions {
+          opacity: 1;
+          pointer-events: auto;
+        }
+        .fc-msg-action {
+          width: auto;
+          min-width: 20px;
+          height: 20px;
+          padding: 0 3px;
+          border: 0;
+          border-radius: 4px;
+          background: transparent;
+          color: var(--dsw-alias-label-tertiary);
+          font: inherit;
+          font-size: 11px;
+          line-height: 20px;
+          text-align: center;
+          cursor: pointer;
+        }
+        .fc-msg-action:hover:not(:disabled) {
+          background: var(--dsw-alias-interactive-bg-hover);
+          color: var(--dsw-alias-label-primary);
+        }
+        .fc-msg-action:focus-visible { outline: 2px solid var(--dsw-focus-ring-color); outline-offset: 1px; }
+        .fc-msg-action:disabled { opacity: 0.45; cursor: default; }
+        .fc-msg-action-danger { color: var(--dsw-alias-state-error-primary); }
+        .fc-msg-action-pending {
+          background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 18%, transparent);
+          color: var(--dsw-alias-state-error-primary);
+        }
+        .fc-msg-content-row {
+          position: relative;
+          display: inline-flex;
+          align-items: flex-start;
+          gap: 4px;
+          max-width: 100%;
+          vertical-align: top;
+        }
+        .fc-msg-content-row .fc-msg-content { flex: 1 1 auto; }
+        .fc-msg-stack-row { margin-top: 10px; }
+        .fc-msg-stack {
+          position: relative;
+          display: inline-block;
+          max-width: 100%;
+          vertical-align: top;
+        }
+        .fc-stack-card {
+          position: absolute;
+          left: 0;
+          right: 0;
+          box-sizing: border-box;
+          padding: 4px 8px;
+          border: 1px solid var(--dsw-alias-border-l2);
+          border-radius: var(--dsw-radius-md);
+          background: var(--dsw-alias-bg-layer-2);
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+          overflow: hidden;
+        }
+        .fc-stack-card-front { position: relative; }
+        .fc-stack-card .fc-msg-line { margin-top: 0; }
+        .fc-stack-card .fc-msg-body { padding-top: 5px; }
+        .fc-stack-card-front:hover .fc-msg-actions,
+        .fc-stack-card-front:focus-within .fc-msg-actions {
+          opacity: 1;
+          pointer-events: auto;
+        }
         .fc-msg.fc-own { flex-direction: row-reverse; }
         .fc-msg.fc-own .fc-msg-body { display: flex; flex-direction: column; align-items: flex-end; }
         .fc-msg.fc-own .fc-msg-head { flex-direction: row-reverse; }
         .fc-msg.fc-own .fc-msg-content { max-width: 100%; text-align: left; }
         .fc-msg.fc-own .fc-msg-name { color: var(--dsw-alias-brand-text); }
+        .fc-msg.fc-own .fc-msg-content-row { flex-direction: row-reverse; }
         .fc-avatar { flex: none; border-radius: 50%; object-fit: cover; background: var(--dsw-alias-bg-layer-2); }
         .fc-avatar-button {
           display: inline-flex;
@@ -3086,7 +3598,7 @@ window.__ModuleLoader__.load({
           color: var(--dsw-alias-label-secondary);
           font-weight: 500;
         }
-        .fc-msg-body { min-width: 0; flex: 1; }
+        .fc-msg-body { position: relative; min-width: 0; flex: 0 1 auto; max-width: 100%; }
         .fc-msg-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
         .fc-msg-name { overflow: hidden; font-size: 12px; font-weight: 500; color: var(--dsw-alias-label-secondary); text-overflow: ellipsis; white-space: nowrap; }
         .fc-user-link {

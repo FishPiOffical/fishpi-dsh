@@ -9,12 +9,26 @@
  */
 
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 
 /** FishPi production origin. A deployment may override it in the service. */
 export const DEFAULT_SITE = 'https://fishpi.cn'
 
+/** The version this package reports; read from the packaged manifest, never guessed. */
+function readPackageVersion() {
+  try {
+    const manifest = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+    return typeof manifest.version === 'string' && manifest.version !== '' ? manifest.version : '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+}
+
+/** The installed extension version, used by the client tag and update check. */
+export const PLUGIN_VERSION = readPackageVersion()
+
 /** Client tag accepted by `/api/v3/chat/messages` (`brand/version`). */
-export const CLIENT_TAG = 'DSH/fishpi-chat-0.1.0'
+export const CLIENT_TAG = `Extension/DSH ${PLUGIN_VERSION}`
 
 /** The largest body the public chat message endpoint accepts. */
 export const MAX_MESSAGE_LENGTH = 4096
@@ -40,6 +54,49 @@ export class FishPiError extends Error {
  */
 export function md5Hex(value) {
   return createHash('md5').update(value, 'utf8').digest('hex')
+}
+
+/**
+ * The HttpOnly refresh cookie the website login sets. The Host keeps its value
+ * in the DSH credential store and sends it back to `/api/v3/auth/refresh`, which
+ * rotates it on every successful refresh.
+ */
+export const REFRESH_COOKIE_NAME = 'fp_v3_refresh'
+
+/**
+ * Read every `Set-Cookie` line from a Fetch response without relying on a
+ * cookie jar. Node exposes `getSetCookie()`; a single joined header is the
+ * fallback for runtimes that do not.
+ * @param {Headers|undefined} headers - response headers.
+ * @returns {string[]} cookie lines.
+ */
+function setCookieLines(headers) {
+  if (headers === undefined || headers === null) return []
+  if (typeof headers.getSetCookie === 'function') {
+    try {
+      const lines = headers.getSetCookie()
+      if (Array.isArray(lines)) return lines
+    } catch {
+      // Fall through to the single-header form.
+    }
+  }
+  const raw = typeof headers.get === 'function' ? headers.get('set-cookie') : null
+  return typeof raw === 'string' && raw !== '' ? [raw] : []
+}
+
+/**
+ * Extract the refresh cookie value from `Set-Cookie` lines.
+ * @param {string[]} lines - cookie lines.
+ * @returns {string} the token, or an empty string.
+ */
+export function refreshCookieFrom(lines) {
+  const pattern = new RegExp(`(?:^|,\\s*)${REFRESH_COOKIE_NAME}=([^;,\\s]+)`)
+  for (const line of lines) {
+    if (typeof line !== 'string') continue
+    const match = pattern.exec(line)
+    if (match !== null) return match[1]
+  }
+  return ''
 }
 
 /**
@@ -85,20 +142,26 @@ export function normalizeMessage(raw) {
 /**
  * A slim public user record for the Host state and message snapshots.
  * @param {unknown} raw - `/api/v3/me` data.
- * @returns {{ id: string, userName: string, userNickname: string, userAvatarURL: string, userPoint?: number }|undefined}
+ * @returns {{ id: string, userName: string, userNickname: string, userAvatarURL: string, userPoint?: number, capabilities?: { chatRevokeOthers: boolean }, userRole?: string }|undefined}
  */
 export function normalizeMe(raw) {
   if (raw === null || typeof raw !== 'object') return undefined
   const source = /** @type {Record<string, any>} */ (raw)
   const id = source.id === undefined || source.id === null ? '' : String(source.id)
   if (id === '') return undefined
-  return {
+  /** @type {{ id: string, userName: string, userNickname: string, userAvatarURL: string, userPoint?: number, capabilities?: { chatRevokeOthers: boolean }, userRole?: string }} */
+  const user = {
     id,
     userName: typeof source.userName === 'string' ? source.userName : '',
     userNickname: typeof source.userNickname === 'string' ? source.userNickname : '',
     userAvatarURL: typeof source.userAvatarURL === 'string' ? source.userAvatarURL : '',
     userPoint: Number.isFinite(Number(source.userPoint)) ? Number(source.userPoint) : undefined,
   }
+  if (source.capabilities !== null && typeof source.capabilities === 'object') {
+    user.capabilities = { chatRevokeOthers: source.capabilities.chatRevokeOthers === true }
+  }
+  if (typeof source.userRole === 'string' && source.userRole !== '') user.userRole = source.userRole
+  return user
 }
 
 /**
@@ -137,8 +200,8 @@ export class FishPiApi {
   /**
    * One enveloped API request.
    * @param {string} path - absolute API path.
-   * @param {{ method?: string, body?: unknown, signal?: AbortSignal, auth?: boolean, idempotencyKey?: string, raw?: boolean }} [options] - request shape.
-   * @returns {Promise<any>} the envelope's `data`, or the raw JSON payload when `raw` is true.
+   * @param {{ method?: string, body?: unknown, signal?: AbortSignal, auth?: boolean, idempotencyKey?: string, raw?: boolean, headers?: Record<string, string>, captureCookies?: boolean }} [options] - request shape.
+   * @returns {Promise<any>} the envelope's `data`, or `{ data, setCookies }` when `captureCookies` is true.
    */
   async request(path, options = {}) {
     const method = options.method ?? 'GET'
@@ -152,6 +215,7 @@ export class FishPiApi {
     }
     if (options.auth !== false && this.token !== '') headers.authorization = `Bearer ${this.token}`
     if (options.idempotencyKey !== undefined) headers['idempotency-key'] = options.idempotencyKey
+    if (options.headers !== undefined && options.headers !== null) Object.assign(headers, options.headers)
     const timeout = AbortSignal.timeout(25_000)
     init.signal = options.signal === undefined ? timeout : AbortSignal.any([options.signal, timeout])
 
@@ -183,19 +247,81 @@ export class FishPiApi {
         },
       )
     }
+    if (options.captureCookies === true) {
+      return {
+        data: options.raw === true ? payload : envelope.data,
+        setCookies: setCookieLines(response.headers),
+      }
+    }
     if (options.raw === true) return payload
     return envelope.data
   }
 
   /**
    * @param {{ nameOrEmail: string, userPassword: string, mfaCode?: string }} input - credentials; password is already MD5.
-   * @returns {Promise<{ accessToken: string, tokenType?: string, expiresIn?: number, scope?: string }>} a login grant.
+   * @returns {Promise<{ accessToken: string, tokenType?: string, expiresIn?: number, refreshExpiresIn?: number, scope?: string, refreshCookie?: string }>} a login grant and the rotating refresh cookie.
    */
-  login(input) {
+  async login(input) {
     /** @type {Record<string, string>} */
     const body = { nameOrEmail: input.nameOrEmail, userPassword: input.userPassword }
     if (input.mfaCode !== undefined && input.mfaCode !== '') body.mfaCode = input.mfaCode
-    return this.request('/api/v3/auth/login', { method: 'POST', body, auth: false })
+    const result = await this.request('/api/v3/auth/login', {
+      method: 'POST',
+      body,
+      auth: false,
+      captureCookies: true,
+    })
+    const grant = result.data !== null && typeof result.data === 'object' ? result.data : {}
+    return { ...grant, refreshCookie: refreshCookieFrom(result.setCookies) }
+  }
+
+  /**
+   * Rotate an expired access token with the website refresh cookie.
+   *
+   * The website refresh endpoint checks the request's Origin, so the Host sends
+   * the same origin the first-party page would; it does not need any other
+   * cookie because the refresh token itself is the credential.
+   * @param {string} refreshCookie - the `fp_v3_refresh` value.
+   * @returns {Promise<{ accessToken: string, expiresIn?: number, refreshExpiresIn?: number, scope?: string, refreshCookie?: string }>} the new access token and rotated cookie.
+   */
+  async refreshWebsite(refreshCookie) {
+    if (typeof refreshCookie !== 'string' || refreshCookie === '') {
+      throw new FishPiError('登录状态已失效，请重新登录', { code: 'unauthorized', status: 401 })
+    }
+    const origin = new URL(this.siteUrl).origin
+    const result = await this.request('/api/v3/auth/refresh', {
+      method: 'POST',
+      body: {},
+      auth: false,
+      captureCookies: true,
+      headers: {
+        origin,
+        referer: `${this.siteUrl}/`,
+        cookie: `${REFRESH_COOKIE_NAME}=${refreshCookie}`,
+      },
+    })
+    const grant = result.data !== null && typeof result.data === 'object' ? result.data : {}
+    return { ...grant, refreshCookie: refreshCookieFrom(result.setCookies) }
+  }
+
+  /**
+   * End the website session that owns the refresh cookie, when possible.
+   * @param {string} refreshCookie - the `fp_v3_refresh` value.
+   * @returns {Promise<void>}
+   */
+  async logoutWebsite(refreshCookie) {
+    if (typeof refreshCookie !== 'string' || refreshCookie === '') return
+    const origin = new URL(this.siteUrl).origin
+    await this.request('/api/v3/auth/logout', {
+      method: 'POST',
+      body: {},
+      auth: false,
+      headers: {
+        origin,
+        referer: `${this.siteUrl}/`,
+        cookie: `${REFRESH_COOKIE_NAME}=${refreshCookie}`,
+      },
+    })
   }
 
   /** @returns {Promise<any>} the current account profile. */
@@ -222,6 +348,19 @@ export class FishPiApi {
    */
   message(id) {
     return this.request(`/api/v3/chat/messages/${encodeURIComponent(id)}`)
+  }
+
+  /**
+   * Recall (withdraw) one of the current account's messages.
+   * @param {string} id - message id.
+   * @param {string} idempotencyKey - stable key for this logical recall.
+   * @returns {Promise<{ removed?: boolean }>} the withdrawal receipt.
+   */
+  revokeMessage(id, idempotencyKey) {
+    return this.request(`/api/v3/chat/messages/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      idempotencyKey,
+    })
   }
 
   /**
