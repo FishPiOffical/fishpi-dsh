@@ -5,7 +5,7 @@
 - npm：<https://www.npmjs.com/package/@iwpz/fishpi-dsh>
 - GitHub：<https://github.com/FishPiOffical/fishpi-dsh>
 - 包名：`@iwpz/fishpi-dsh`
-- 当前版本：`0.1.3`
+- 当前版本：`0.1.4`
 
 ![DSH 右侧边栏中的摸鱼派聊天室](docs/screenshot.jpg)
 
@@ -21,6 +21,8 @@
 - 相邻文本消息的 `content` 完全相等（同一自然日内）时，每条消息都按正常消息完整渲染成一张卡片（头像、昵称、时间、勋章、正文等元素一个不少）；后一张卡片整体覆盖到前一张的正文上，只露出前一张的头像/昵称/时间行，最上层的最新卡片显示完整正文。同一个人多次复读也会出现多张相同头像/昵称的卡片，不去重。卡片宽度随内容，不铺满整行；复读组整体按左侧渲染，即使组里有「我」的消息。折叠只在本页内存中计算，不写入服务端或凭据。
 - 输入框自动增高，不显示垂直滚动条；发送按钮在输入框右侧。
 - 输入框左侧 `+` 可选择多张图片，支持直接粘贴剪贴板图片；上传后插入 Markdown 图片。
+- 点击聊天图片在整个 DSH 窗口中查看，按左右方向键切换已加载的图片，按 `Esc` 返回聊天。
+- 引用回复先显示自己写的正文，再显示引用体。
 - 富文本模式渲染鱼排清洗后的 Markdown / 图片 / 链接；纯文本模式只显示文字，图片显示为 `[图片]` / `[Image]`。
 - 链接在外部浏览器打开。
 
@@ -75,7 +77,7 @@
    ```
    或指定版本：
    ```
-   @iwpz/fishpi-dsh@0.1.3
+   @iwpz/fishpi-dsh@0.1.4
    ```
 3. 安装后启用插件，刷新页面。
 
@@ -103,8 +105,8 @@ git clone https://github.com/FishPiOffical/fishpi-dsh.git
 
 ### 方式三：ZIP
 
-1. 下载 [fishpi-dsh-0.1.3.zip](https://github.com/FishPiOffical/fishpi-dsh/releases/download/v0.1.3/fishpi-dsh-0.1.3.zip)。
-2. 解压，得到 `fishpi-dsh-0.1.3` 文件夹。
+1. 下载 [fishpi-dsh-0.1.4.zip](https://github.com/FishPiOffical/fishpi-dsh/releases/download/v0.1.4/fishpi-dsh-0.1.4.zip)。
+2. 解压，得到 `fishpi-dsh-0.1.4` 文件夹。
 3. DSH **Plugins → Add plugin** → 选择解压后的文件夹。
 4. 启用插件并刷新页面。
 
@@ -135,7 +137,7 @@ git clone https://github.com/FishPiOffical/fishpi-dsh.git
 - 访问令牌和刷新凭据 `fp_v3_refresh` 保存在本机 DSH 凭据库的记录 `fishpi-chat/account` 中，不写入 `cordis.patch.yml`，也不放进 localStorage。
 - 密码只在首次登录时由 Host 使用，不会保存，也不会进入页面；页面只通过 DSH 同源的 `api/fishpi/*` 认证路由访问 Host，token 和刷新凭据不会进入页面。
 - 刷新凭据每次续期都会轮换，旧值立即失效；插件串行执行续期，避免并发刷新互相作废。
-- 发送聊天消息时携带 `client: Deepseek Harness/<插件版本>`（当前 `Deepseek Harness/0.1.3`），版本号从 `package.json` 读取。
+- 发送聊天消息时携带 `client: Deepseek Harness/<插件版本>`（当前 `Deepseek Harness/0.1.4`），版本号从 `package.json` 读取。
 - 鱼排登录由 DSH Host 发起；聊天室 WebSocket 也由 Host 维持，页面不直接调用鱼排 API。
 - 富文本中的图片由页面从鱼排图床加载。
 - 退出登录会删除凭据记录。

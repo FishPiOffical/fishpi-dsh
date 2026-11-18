@@ -110,6 +110,8 @@ window.__ModuleLoader__.load({
       'message.repeat': '复读 +1',
       'composer.placeholder': '说点什么…',
       'composer.addImage': '添加图片',
+      'composer.quoteCount': '引用 {count} 条消息',
+      'composer.removeQuotes': '清除引用',
       'composer.uploading': '正在上传图片…',
       'mention.title': '提及用户',
       'mention.hint': '继续输入用户名进行搜索',
@@ -118,6 +120,12 @@ window.__ModuleLoader__.load({
       messages: '聊天室消息',
       jump: '跳到最新消息',
       'plain.image': '图片',
+      'image.preview': '查看大图',
+      'image.close': '关闭图片预览',
+      'image.previous': '上一张',
+      'image.next': '下一张',
+      'image.position': '{current} / {total}',
+      'image.failed': '图片加载失败',
       'redPacket.title': '红包',
       'redPacket.type.random': '拼手气红包',
       'redPacket.type.average': '普通红包',
@@ -253,6 +261,8 @@ window.__ModuleLoader__.load({
       'message.repeat': 'Repeat +1',
       'composer.placeholder': 'Say something…',
       'composer.addImage': 'Add images',
+      'composer.quoteCount': 'Quoted messages: {count}',
+      'composer.removeQuotes': 'Clear quotes',
       'composer.uploading': 'Uploading images…',
       'mention.title': 'Mention a user',
       'mention.hint': 'Keep typing a username to search',
@@ -261,6 +271,12 @@ window.__ModuleLoader__.load({
       messages: 'Chat messages',
       jump: 'Jump to latest',
       'plain.image': 'Image',
+      'image.preview': 'View image',
+      'image.close': 'Close image preview',
+      'image.previous': 'Previous image',
+      'image.next': 'Next image',
+      'image.position': '{current} / {total}',
+      'image.failed': 'Could not load image',
       'redPacket.title': 'Red packet',
       'redPacket.type.random': 'Random red packet',
       'redPacket.type.average': 'Standard red packet',
@@ -535,9 +551,9 @@ window.__ModuleLoader__.load({
      * @returns {string} HTML whose links and images are hardened for an embedded panel.
      */
     const htmlCache = new Map()
-    function prepareHtml(html, base) {
+    function prepareHtml(html, base, previewLabel = '') {
       if (html === '') return ''
-      const cacheKey = `${base}\n${html}`
+      const cacheKey = `${base}\n${previewLabel}\n${html}`
       const cached = htmlCache.get(cacheKey)
       if (cached !== undefined) return cached
       const origin = typeof base === 'string' && base !== '' ? base : 'https://fishpi.cn'
@@ -584,6 +600,13 @@ window.__ModuleLoader__.load({
             element.setAttribute('src', resolved)
             element.setAttribute('loading', 'lazy')
             element.setAttribute('referrerpolicy', 'no-referrer')
+            element.removeAttribute('data-fc-preview')
+            if (previewLabel !== '') {
+              element.dataset.fcPreview = ''
+              element.tabIndex = 0
+              element.setAttribute('role', 'button')
+              element.setAttribute('aria-label', element.alt ? `${previewLabel}: ${element.alt}` : previewLabel)
+            }
           }
         }
         output = template.innerHTML
@@ -1890,7 +1913,7 @@ window.__ModuleLoader__.load({
     /**
      * @param {{message: object, mode: 'rich'|'plain', t: Function}} props - one message body.
      */
-    function MessageContent({ message, mode, t, siteUrl }) {
+    function MessageContent({ message, mode, t, siteUrl, previewable }) {
       if (message.type === 'unavailable') {
         return h('div', { className: 'fc-unavailable' }, t('card.unavailable'))
       }
@@ -1927,7 +1950,7 @@ window.__ModuleLoader__.load({
       if (message.contentHtml !== '') {
         return h('div', {
           className: 'fc-html',
-          dangerouslySetInnerHTML: { __html: prepareHtml(message.contentHtml, siteUrl) },
+          dangerouslySetInnerHTML: { __html: prepareHtml(message.contentHtml, siteUrl, previewable ? t('image.preview') : '') },
         })
       }
       return h('div', { className: 'fc-plain' }, message.content)
@@ -1964,6 +1987,7 @@ window.__ModuleLoader__.load({
                 siteUrl,
                 medalIcons: medalIcons[message.author?.userName ?? ''] ?? [],
                 actions: front ? actions : null,
+                previewable: front,
               }),
             )
           }),
@@ -1974,7 +1998,7 @@ window.__ModuleLoader__.load({
     /**
      * @param {{message: object, own: boolean, grouped: boolean, mode: string, t: Function}} props - one row.
      */
-    function MessageRow({ message, own, grouped, mode, t, siteUrl, medalIcons = [], actions = null }) {
+    function MessageRow({ message, own, grouped, mode, t, siteUrl, medalIcons = [], actions = null, previewable = true }) {
       if (message.type === 'system') {
         return h('div', { className: 'fc-system' }, message.text)
       }
@@ -2031,7 +2055,7 @@ window.__ModuleLoader__.load({
                   h('time', { className: 'fc-msg-time', dateTime: new Date(message.createdAt).toISOString() }, clock(message.createdAt)),
                 ),
             h('div', { className: 'fc-msg-content-row' },
-              h('div', { className: 'fc-msg-content' }, h(MessageContent, { message, mode, t, siteUrl })),
+              h('div', { className: 'fc-msg-content' }, h(MessageContent, { message, mode, t, siteUrl, previewable })),
               actions,
             ),
           ),
@@ -2742,6 +2766,101 @@ window.__ModuleLoader__.load({
     /**
      * @param {{useTabInfo: Function, t: Function}} props - the right-Sidebar tab body.
      */
+    function imagePreviewFromEvent(event) {
+      if (event.defaultPrevented || (event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ')) return null
+      const trigger = event.target
+      const selector = '.fc-html img[data-fc-preview][src]'
+      if (!trigger.matches?.(selector)) return null
+      const thumbnails = [...event.currentTarget.querySelectorAll(selector)]
+      const index = thumbnails.indexOf(trigger)
+      if (index < 0) return null
+      event.preventDefault()
+      event.stopPropagation()
+      return {
+        index,
+        trigger,
+        images: thumbnails.map(image => ({ src: image.src, alt: image.alt })),
+      }
+    }
+
+    function ImagePreview({ gallery, onClose, t }) {
+      const { images, trigger } = gallery
+      const [index, setIndex] = useState(gallery.index)
+      const [failedIndex, setFailedIndex] = useState(null)
+      const dialogRef = useRef(null)
+      const image = images[index]
+
+      useLayoutEffect(() => {
+        const dialog = dialogRef.current
+        dialog.showModal()
+        return () => {
+          dialog.close()
+          if (trigger.isConnected) trigger.focus({ preventScroll: true })
+        }
+      }, [trigger])
+
+      const move = offset => {
+        const next = index + offset
+        if (next >= 0 && next < images.length) {
+          setFailedIndex(null)
+          setIndex(next)
+        }
+      }
+
+      const previewButton = (label, symbol, offset) => h('button', {
+        type: 'button',
+        className: `fc-image-preview-button fc-image-preview-${offset < 0 ? 'prev' : 'next'}`,
+        'aria-label': t(label),
+        title: t(label),
+        'aria-disabled': index + offset < 0 || index + offset >= images.length,
+        onClick: () => move(offset),
+      }, symbol)
+
+      return h('dialog', {
+        ref: dialogRef,
+        className: 'fc-image-preview',
+        'aria-label': t('image.preview'),
+        onCancel: event => {
+          event.preventDefault()
+          event.stopPropagation()
+          onClose()
+        },
+        onKeyDown: event => {
+          if (!['ArrowLeft', 'ArrowRight', 'Escape'].includes(event.key)) return
+          event.preventDefault()
+          event.stopPropagation()
+          if (event.key === 'Escape') onClose()
+          else move(event.key === 'ArrowLeft' ? -1 : 1)
+        },
+      },
+        h('div', { className: 'fc-image-preview-layout' },
+          h('header', { className: 'fc-image-preview-header' },
+            h('span', { role: 'status' }, t('image.position', { current: index + 1, total: images.length })),
+            h('button', {
+              type: 'button',
+              className: 'fc-image-preview-button',
+              'aria-label': t('image.close'),
+              title: t('image.close'),
+              onClick: onClose,
+            }, '×'),
+          ),
+          h('div', { className: 'fc-image-preview-stage' },
+            failedIndex === index
+              ? h('span', { role: 'status' }, t('image.failed'))
+              : h('img', {
+                  key: index,
+                  src: image.src,
+                  alt: image.alt || t('plain.image'),
+                  referrerPolicy: 'no-referrer',
+                  onError: () => setFailedIndex(index),
+                }),
+            images.length > 1 ? previewButton('image.previous', '‹', -1) : null,
+            images.length > 1 ? previewButton('image.next', '›', 1) : null,
+          ),
+        ),
+      )
+    }
+
     function ChatPanel({ useTabInfo, t }) {
       const store = sharedStore
       const state = useStore()
@@ -2749,6 +2868,7 @@ window.__ModuleLoader__.load({
       const visible = info?.tab?.visible === true
       const mode = state.prefs.mode
       const [draft, setDraft] = useState('')
+      const [quotes, setQuotes] = useState([])
       const [atBottom, setAtBottom] = useState(true)
       const [mention, setMention] = useState({ open: false, items: [], index: 0, start: 0, end: 0, query: '' })
       const mentionTimerRef = useRef()
@@ -2760,6 +2880,16 @@ window.__ModuleLoader__.load({
       const restoreRef = useRef(null)
       const recallTimerRef = useRef()
       const [recallingId, setRecallingId] = useState('')
+      const [imagePreview, setImagePreview] = useState(null)
+
+      const openImagePreview = event => {
+        const gallery = imagePreviewFromEvent(event)
+        if (gallery !== null) setImagePreview(gallery)
+      }
+
+      useEffect(() => {
+        if (!visible || !state.loggedIn || mode !== 'rich') setImagePreview(null)
+      }, [visible, state.loggedIn, mode])
 
       useEffect(() => {
         store.setChatVisible(visible)
@@ -2806,12 +2936,16 @@ window.__ModuleLoader__.load({
         if (added === 0) restoreRef.current = null
       }
 
+      const content = [draft.trim(), ...quotes.map(quote => quote.markdown)].filter(Boolean).join('\n\n')
+
       const doSend = async () => {
-        const content = draft.trim()
         if (content === '' || state.sending) return
         stickRef.current = true
         const result = await store.send(content)
-        if (result.ok) setDraft(current => current === content ? '' : current)
+        if (result.ok) {
+          setDraft(current => current === draft ? '' : current)
+          setQuotes(current => current.filter(quote => !quotes.includes(quote)))
+        }
       }
 
       const onKeyDown = event => {
@@ -2996,8 +3130,7 @@ window.__ModuleLoader__.load({
           ? `##### 引用 @${author} [↩](${link} "跳转至原消息")`
           : `##### 引用 [↩](${link} "跳转至原消息")`
         const quoted = source.split('\n').map(line => `> ${line}`).join('\n')
-        const base = draft.trim() === '' ? '' : `${draft.replace(/\s+$/u, '')}\n\n`
-        setDraft(`${base}${attribution}  \n${quoted}\n`)
+        setQuotes(current => [...current, { markdown: `${attribution}  \n${quoted}`, summary: messageSummary(message, t) }])
         closeMention()
         requestAnimationFrame(() => {
           const element = textareaRef.current
@@ -3247,7 +3380,10 @@ window.__ModuleLoader__.load({
         ? h('div', { className: 'fc-empty' }, t('loading'))
         : state.messages.length === 0
           ? h('div', { className: 'fc-empty' }, t('empty'))
-          : h('div', { className: 'fc-list', ref: scrollRef, onScroll, role: 'log', 'aria-label': t('messages') },
+          : h('div', {
+              className: 'fc-list', ref: scrollRef, onScroll, role: 'log', 'aria-label': t('messages'),
+              onClick: openImagePreview, onKeyDown: openImagePreview,
+            },
               state.hasMore
                 ? h('button', {
                     type: 'button',
@@ -3340,7 +3476,7 @@ window.__ModuleLoader__.load({
             h('button', {
               type: 'button',
               className: 'fc-button fc-button-primary fc-send',
-              disabled: draft.trim() === '' || state.sending || state.uploadingImages,
+              disabled: content === '' || state.sending || state.uploadingImages,
               onClick: () => { void doSend() },
             }, state.sending ? t('composer.sending') : t('composer.send')),
           ),
@@ -3356,15 +3492,28 @@ window.__ModuleLoader__.load({
               if (files.length > 0) void appendFiles(files)
             },
           }),
+          quotes.length > 0 ? h('div', { className: 'fc-composer-quote' },
+            h('span', { title: quotes.at(-1).summary }, `${t('composer.quoteCount', { count: quotes.length })} · ${quotes.at(-1).summary}`),
+            h('button', {
+              type: 'button',
+              className: 'fc-icon-button',
+              title: t('composer.removeQuotes'),
+              'aria-label': t('composer.removeQuotes'),
+              onClick: () => setQuotes([]),
+            }, '×'),
+          ) : null,
           h('div', { className: 'fc-composer-foot' },
-            h('span', { className: `fc-count${draft.length > 3800 ? ' fc-count-warn' : ''}` },
+            h('span', { className: `fc-count${content.length > 3800 ? ' fc-count-warn' : ''}` },
               state.uploadingImages
                 ? t('composer.uploading')
-                : draft.length > 0 ? `${draft.length}/4096` : ''),
+                : content.length > 0 ? `${content.length}/4096` : ''),
           ),
         ),
         h(RedPacketDialog, { t }),
         h(UserInfoDialog, { t }),
+        imagePreview === null ? null : h(ImagePreview, {
+          gallery: imagePreview, t, onClose: () => setImagePreview(null),
+        }),
       )
     }
 
@@ -3621,6 +3770,63 @@ window.__ModuleLoader__.load({
         .fc-html a, .fc-plain a { color: var(--dsw-alias-link); text-decoration: none; }
         .fc-html a:hover, .fc-plain a:hover { text-decoration: underline; }
         .fc-html img { display: block; max-width: 100%; max-height: 320px; margin: 6px 0; border-radius: var(--dsw-radius-md); }
+        .fc-html img[data-fc-preview] { cursor: zoom-in; }
+        .fc-html img[data-fc-preview]:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+        .fc-image-preview {
+          position: fixed;
+          inset: 0;
+          box-sizing: border-box;
+          width: 100%;
+          height: 100%;
+          max-width: none;
+          max-height: none;
+          margin: 0;
+          padding: 0;
+          border: 0;
+          background: #16171a;
+          color: #fff;
+          overflow: hidden;
+        }
+        .fc-image-preview-layout { display: flex; flex-direction: column; height: 100%; }
+        .fc-image-preview-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          padding: 8px 12px;
+          font: 13px system-ui, sans-serif;
+        }
+        .fc-image-preview-stage {
+          position: relative;
+          display: grid;
+          flex: 1;
+          min-height: 0;
+          min-width: 0;
+          grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+          place-items: center;
+          padding: 8px;
+          overflow: hidden;
+        }
+        .fc-image-preview-stage img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+        .fc-image-preview-button {
+          display: grid;
+          place-items: center;
+          width: 38px;
+          height: 38px;
+          padding: 0;
+          border: 1px solid #ffffff40;
+          border-radius: 8px;
+          color: #fff;
+          background: #25262ce6;
+          font: 25px/1 system-ui, sans-serif;
+          cursor: pointer;
+        }
+        .fc-image-preview-button:hover:not([aria-disabled="true"]) { background: #44454e; }
+        .fc-image-preview-button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+        .fc-image-preview-button[aria-disabled="true"] { opacity: 0.35; cursor: default; }
+        .fc-image-preview-prev, .fc-image-preview-next { position: absolute; top: 50%; transform: translateY(-50%); }
+        .fc-image-preview-prev { left: 8px; }
+        .fc-image-preview-next { right: 8px; }
         .fc-html pre, .fc-plain pre {
           overflow-x: auto;
           margin: 6px 0;
@@ -3851,6 +4057,8 @@ window.__ModuleLoader__.load({
         .fc-mention-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .fc-mention-empty { padding: 8px; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
         .fc-composer-row { display: flex; align-items: flex-end; gap: 6px; }
+        .fc-composer-quote { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-left: 8px; border-left: 2px solid var(--dsw-alias-border-l2); font-size: 12px; }
+        .fc-composer-quote > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .fc-plus {
           flex: none;
           width: 32px;
