@@ -28,7 +28,7 @@ function readPackageVersion() {
 export const PLUGIN_VERSION = readPackageVersion()
 
 /** Client tag accepted by `/api/v3/chat/messages` (`brand/version`). */
-export const CLIENT_TAG = `Extension/DSH ${PLUGIN_VERSION}`
+export const CLIENT_TAG = `Deepseek Harness/${PLUGIN_VERSION}`
 
 /** The largest body the public chat message endpoint accepts. */
 export const MAX_MESSAGE_LENGTH = 4096

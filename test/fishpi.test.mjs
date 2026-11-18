@@ -99,7 +99,7 @@ test('FishPiApi send carries the extension client tag', async () => {
   const body = JSON.parse(calls[0].init.body)
   assert.equal(body.content, 'hello')
   assert.equal(body.client, CLIENT_TAG)
-  assert.equal(body.client, `Extension/DSH ${PLUGIN_VERSION}`)
+  assert.equal(body.client, `Deepseek Harness/${PLUGIN_VERSION}`)
   assert.equal(calls[0].init.headers['idempotency-key'], 'fishpi-chat-test')
 })
 

@@ -1,0 +1,107 @@
+# npm Trusted Publisher: FishPiOffical/fishpi-dsh, workflow release.yml.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Verify release version
+        id: version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - run: node --test test/fishpi.test.mjs test/host.test.mjs test/client.test.mjs
+
+      - name: Build npm tarball and Release ZIP
+        id: package
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          npm pack --json --pack-destination "$RUNNER_TEMP" > "$RUNNER_TEMP/npm-pack.json"
+          filename="$(jq -er '.[0].filename' "$RUNNER_TEMP/npm-pack.json")"
+          integrity="$(jq -er '.[0].integrity' "$RUNNER_TEMP/npm-pack.json")"
+          archive="$RUNNER_TEMP/$filename"
+
+          staging="$(mktemp -d)"
+          trap 'rm -rf "$staging"' EXIT
+          folder="fishpi-dsh-$VERSION"
+          mkdir "$staging/$folder"
+          tar -xzf "$archive" -C "$staging/$folder" --strip-components=1
+          asset="$RUNNER_TEMP/$folder.zip"
+          (cd "$staging" && zip -q -X -r "$asset" "$folder")
+
+          {
+            echo "archive=$archive"
+            echo "integrity=$integrity"
+            echo "asset=$asset"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+          INTEGRITY: ${{ steps.package.outputs.integrity }}
+        run: |
+          metadata="$RUNNER_TEMP/npm-version.json"
+          status="$(curl --silent --show-error --retry 3 --output "$metadata" \
+            --write-out '%{http_code}' "https://registry.npmjs.org/@iwpz%2ffishpi-dsh/$VERSION")"
+          case "$status" in
+            404)
+              npm publish "$ARCHIVE" --access public
+              ;;
+            200)
+              if [[ "$(jq -er '.dist.integrity' "$metadata")" != "$INTEGRITY" ]]; then
+                echo "::error::npm version $VERSION already exists with different package contents"
+                exit 1
+              fi
+              echo "npm version $VERSION is already published"
+              ;;
+            *)
+              echo "::error::npm registry returned HTTP $status"
+              exit 1
+              ;;
+          esac
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ASSET: ${{ steps.package.outputs.asset }}
+        run: |
+          release_id="$GITHUB_REF_NAME"
+          if release="$(gh release view "$release_id" --json assets,isDraft)"; then
+            if ! jq -e --arg name "${ASSET##*/}" 'any(.assets[]; .name == $name)' <<< "$release" >/dev/null; then
+              gh release upload "$release_id" "$ASSET"
+            fi
+            if jq -e '.isDraft' <<< "$release" >/dev/null; then
+              gh release edit "$release_id" --draft=false
+            fi
+          else
+            gh release create "$release_id" "$ASSET" --verify-tag --generate-notes
+          fi
