@@ -5,7 +5,7 @@
 - npm：<https://www.npmjs.com/package/@iwpz/fishpi-dsh>
 - GitHub：<https://github.com/FishPiOffical/fishpi-dsh>
 - 包名：`@iwpz/fishpi-dsh`
-- 当前版本：`0.1.4`
+- 当前版本：`0.1.5`
 
 ![DSH 右侧边栏中的摸鱼派聊天室](docs/screenshot.jpg)
 
@@ -77,7 +77,7 @@
    ```
    或指定版本：
    ```
-   @iwpz/fishpi-dsh@0.1.4
+   @iwpz/fishpi-dsh@0.1.5
    ```
 3. 安装后启用插件，刷新页面。
 
@@ -105,8 +105,8 @@ git clone https://github.com/FishPiOffical/fishpi-dsh.git
 
 ### 方式三：ZIP
 
-1. 下载 [fishpi-dsh-0.1.4.zip](https://github.com/FishPiOffical/fishpi-dsh/releases/download/v0.1.4/fishpi-dsh-0.1.4.zip)。
-2. 解压，得到 `fishpi-dsh-0.1.4` 文件夹。
+1. 下载 [fishpi-dsh-0.1.5.zip](https://github.com/FishPiOffical/fishpi-dsh/releases/download/v0.1.5/fishpi-dsh-0.1.5.zip)。
+2. 解压，得到 `fishpi-dsh-0.1.5` 文件夹。
 3. DSH **Plugins → Add plugin** → 选择解压后的文件夹。
 4. 启用插件并刷新页面。
 
@@ -137,7 +137,7 @@ git clone https://github.com/FishPiOffical/fishpi-dsh.git
 - 访问令牌和刷新凭据 `fp_v3_refresh` 保存在本机 DSH 凭据库的记录 `fishpi-chat/account` 中，不写入 `cordis.patch.yml`，也不放进 localStorage。
 - 密码只在首次登录时由 Host 使用，不会保存，也不会进入页面；页面只通过 DSH 同源的 `api/fishpi/*` 认证路由访问 Host，token 和刷新凭据不会进入页面。
 - 刷新凭据每次续期都会轮换，旧值立即失效；插件串行执行续期，避免并发刷新互相作废。
-- 发送聊天消息时携带 `client: Deepseek Harness/<插件版本>`（当前 `Deepseek Harness/0.1.4`），版本号从 `package.json` 读取。
+- 发送聊天消息时携带 `client: Deepseek Harness/<插件版本>`（当前 `Deepseek Harness/0.1.5`），版本号从 `package.json` 读取。
 - 鱼排登录由 DSH Host 发起；聊天室 WebSocket 也由 Host 维持，页面不直接调用鱼排 API。
 - 富文本中的图片由页面从鱼排图床加载。
 - 退出登录会删除凭据记录。

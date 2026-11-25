@@ -2929,6 +2929,14 @@ window.__ModuleLoader__.load({
         setAtBottom(near)
       }, [])
 
+      const onImageSettled = useCallback(event => {
+        // Image dimensions arrive after the message layout effect has run.
+        // Keep following the bottom only while the reader has not scrolled away.
+        if (event.target.tagName !== 'IMG' || !stickRef.current || restoreRef.current !== null) return
+        const element = scrollRef.current
+        if (element !== null) element.scrollTop = element.scrollHeight
+      }, [])
+
       const loadOlder = async () => {
         const element = scrollRef.current
         if (element !== null) restoreRef.current = { height: element.scrollHeight, top: element.scrollTop }
@@ -3383,6 +3391,7 @@ window.__ModuleLoader__.load({
           : h('div', {
               className: 'fc-list', ref: scrollRef, onScroll, role: 'log', 'aria-label': t('messages'),
               onClick: openImagePreview, onKeyDown: openImagePreview,
+              onLoadCapture: onImageSettled, onErrorCapture: onImageSettled,
             },
               state.hasMore
                 ? h('button', {
